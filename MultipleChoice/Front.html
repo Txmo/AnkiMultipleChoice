@@ -1,0 +1,169 @@
+<!--#region INIT Persistance-->
+<script>
+    // v0.5.0 - https://github.com/SimonLammer/anki-persistence/blob/6ee3446a97f24e037c14642d6aa608ccbc6f3169/script.js
+    if (void 0 === window.Persistence) {
+        var _persistenceKey = "github.com/SimonLammer/anki-persistence/", _defaultKey = "_default";
+        if (window.Persistence_sessionStorage = function () {
+            var e = !1;
+            try {
+                "object" == typeof window.sessionStorage && (e = !0, this.clear = function () {
+                    for (var e = 0; e < sessionStorage.length; e++) {
+                        var t = sessionStorage.key(e);
+                        0 == t.indexOf(_persistenceKey) && (sessionStorage.removeItem(t), e--)
+                    }
+                }, this.setItem = function (e, t) {
+                    void 0 == t && (t = e, e = _defaultKey), sessionStorage.setItem(_persistenceKey + e, JSON.stringify(t))
+                }, this.getItem = function (e) {
+                    return void 0 == e && (e = _defaultKey), JSON.parse(sessionStorage.getItem(_persistenceKey + e))
+                }, this.removeItem = function (e) {
+                    void 0 == e && (e = _defaultKey), sessionStorage.removeItem(_persistenceKey + e)
+                })
+            } catch (e) {
+            }
+            this.isAvailable = function () {
+                return e
+            }
+        }, window.Persistence_windowKey = function (e) {
+            var t = window[e], i = !1;
+            "object" == typeof t && (i = !0, this.clear = function () {
+                t[_persistenceKey] = {}
+            }, this.setItem = function (e, i) {
+                void 0 == i && (i = e, e = _defaultKey), t[_persistenceKey][e] = i
+            }, this.getItem = function (e) {
+                return void 0 == e && (e = _defaultKey), t[_persistenceKey][e] || null
+            }, this.removeItem = function (e) {
+                void 0 == e && (e = _defaultKey), delete t[_persistenceKey][e]
+            }, void 0 == t[_persistenceKey] && this.clear()), this.isAvailable = function () {
+                return i
+            }
+        }, window.Persistence = new Persistence_sessionStorage, Persistence.isAvailable() || (window.Persistence = new Persistence_windowKey("py")), !Persistence.isAvailable()) {
+            var titleStartIndex = window.location.toString().indexOf("title"),
+                titleContentIndex = window.location.toString().indexOf("main", titleStartIndex);
+            titleStartIndex > 0 && titleContentIndex > 0 && titleContentIndex - titleStartIndex < 10 && (window.Persistence = new Persistence_windowKey("qt"))
+        }
+    }
+</script>
+<!--#endregion-->
+
+<div id="front">
+    {{#Title}}
+    <div>{{Title}}</div>
+    {{/Title}}
+    <br>
+    {{#Question}}
+    <div>{{Question}}</div>
+    {{/Question }}
+    <br>
+    <div id="frontChoices">
+        {{#Q_1}}
+        <div><label><input name="choices" value="1" type="radio">{{Q_1}}</label>
+        </div>
+        {{/Q_1}}
+        {{#Q_2}}
+        <div><label><input name="choices" value="2" type="radio">{{Q_2}}</label>
+        </div>
+        {{/Q_2}}
+        {{#Q_3}}
+        <div><label><input name="choices" value="3" type="radio">{{Q_3}}</label>
+        </div>
+        {{/Q_3}}
+        {{#Q_4}}
+        <div><label><input name="choices" value="4" type="radio">{{Q_4}}</label>
+        </div>
+        {{/Q_4}}
+        {{#Q_5}}
+        <div><label><input name="choices" value="5" type="radio">{{Q_5}}</label>
+        </div>
+        {{/Q_5}}
+        {{#Q_6}}
+        <div><label><input name="choices" value="6" type="radio">{{Q_6}}</label>
+        </div>
+        {{/Q_6}}
+    </div>
+    <input id="hiddenCorrectAnswer" type="hidden" value="{{Answers}}">
+</div>
+<div id="debug"></div>
+
+<!--#region INIT TXMO_MC-->
+<script>
+    const txmoMC = {
+
+        typeRadio: 1,
+        typeCheckbox: 2,
+        currentType: 1,
+
+        correctAnswers: null,
+        inputs: [],
+
+        debugDom: null,
+
+        init: function () {
+            if (!Persistence.isAvailable()) {
+                return;
+            }
+            const answer = document.getElementById('hiddenCorrectAnswer');
+            txmoMC.correctAnswers = answer.value;
+            if (txmoMC.correctAnswers.indexOf(',') >= 0) {
+                txmoMC.currentType = txmoMC.typeCheckbox;
+            }
+            txmoMC.correctAnswers = txmoMC.correctAnswers.replace(/' '/, '');
+            if (txmoMC.currentType === txmoMC.typeCheckbox) {
+                txmoMC.correctAnswers = txmoMC.correctAnswers.replace(/;/, ',').split(',');
+            }
+
+            document.querySelectorAll('input[name="choices"]').forEach(function (elem) {
+                txmoMC.inputs.push(elem);
+                elem.addEventListener('click', function (e) {
+                    txmoMC.updateUserChoice(e.target);
+                })
+            });
+            txmoMC.inputs.forEach(function (elem) {
+                if (txmoMC.currentType === txmoMC.typeCheckbox) {
+                    elem.type = 'checkbox';
+                }
+            });
+
+            txmoMC.shuffle(document.getElementById('frontChoices'));
+
+            Persistence.setItem('correct_answer', txmoMC.correctAnswers);
+        },
+
+        updateUserChoice: function (dom) {
+            var newUserChoice;
+            if (txmoMC.currentType === txmoMC.typeCheckbox) {
+                newUserChoice = [];
+                document.querySelectorAll('input[name="choices"]').forEach(function (elem) {
+                    if (elem.checked) {
+                        newUserChoice.push(elem.value);
+                    }
+                });
+            } else {
+                newUserChoice = dom.value;
+            }
+            Persistence.setItem('user_choice', newUserChoice);
+        },
+
+        debug: function (...value) {
+            if (!txmoMC.debugDom) {
+                return;
+            }
+            txmoMC.debugDom.innerText = '';
+            value.forEach(function (val) {
+                txmoMC.debugDom.innerText += '<hr>' + JSON.stringify(val);
+            });
+        },
+
+        shuffle: function (dom) {
+            for (var i = dom.children.length; i >= 0; i--) {
+                dom.appendChild(dom.children[Math.random() * i | 0]);
+            }
+        }
+    };
+
+    if (document.readyState === "complete") {
+        txmoMC.init();
+    } else {
+        document.addEventListener("DOMContentLoaded", txmoMC.init);
+    }
+</script>
+<!--#endregion-->
